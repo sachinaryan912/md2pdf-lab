@@ -1,0 +1,189 @@
+name: CI/CD — Build, Test & Deploy to Google Cloud Run
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened]
+
+env:
+  NODE_VERSION: '20'
+  IMAGE_NAME: md2pdf-lab
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Job 1: Lint, Type-check, Test
+  # ─────────────────────────────────────────────────────────────────
+  test:
+    name: 🧪 Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm run test:coverage
+        env:
+          CI: 'true' # Skips Puppeteer-dependent tests
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 2: Build TypeScript
+  # ─────────────────────────────────────────────────────────────────
+  build:
+    name: 🔨 Build TypeScript
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 3: Build Docker image & push to Artifact Registry
+  # Only runs on push to master (not PRs)
+  # ─────────────────────────────────────────────────────────────────
+  docker:
+    name: 🐳 Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    outputs:
+      image_url: ${{ steps.image-url.outputs.url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Set image URL
+        id: image-url
+        run: |
+          IMAGE_URL="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "url=$IMAGE_URL" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_URL=$IMAGE_URL" >> "$GITHUB_ENV"
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --tag "$IMAGE_URL" \
+            --tag "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:latest" \
+            --cache-from "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:latest" \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            .
+        env:
+          DOCKER_BUILDKIT: 1
+
+      - name: Push Docker image
+        run: |
+          docker push "$IMAGE_URL"
+          docker push "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:latest"
+
+  # ─────────────────────────────────────────────────────────────────
+  # Job 4: Deploy to Google Cloud Run
+  # ─────────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: docker
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ secrets.SERVICE_NAME }} \
+            --image="${{ needs.docker.outputs.image_url }}" \
+            --region="${{ secrets.GCP_REGION }}" \
+            --platform=managed \
+            --allow-unauthenticated \
+            --memory=1Gi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=10 \
+            --port=8080 \
+            --set-env-vars="NODE_ENV=production,LOG_LEVEL=info" \
+            --timeout=300
+
+      - name: Get Cloud Run service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ secrets.SERVICE_NAME }} \
+            --region="${{ secrets.GCP_REGION }}" \
+            --format="value(status.url)")
+          echo "✅ Deployed to: $SERVICE_URL"
+          echo "SERVICE_URL=$SERVICE_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test deployed service
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ secrets.SERVICE_NAME }} \
+            --region="${{ secrets.GCP_REGION }}" \
+            --format="value(status.url)")
+          sleep 5
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Health check failed with HTTP $STATUS"
+            exit 1
+          fi
+          echo "✅ Smoke test passed (HTTP $STATUS)"
