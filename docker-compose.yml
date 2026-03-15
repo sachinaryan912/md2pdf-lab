@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: md2pdf-lab
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DEFAULT_THEME=${DEFAULT_THEME:-light}
+    restart: unless-stopped
+    # Resource limits (Chromium can be memory-hungry)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    # Shared memory is needed by Chromium
+    shm_size: '256mb'
+    security_opt:
+      - no-new-privileges:true
+
+volumes: {}
+
+networks:
+  default:
+    name: md2pdf-network
