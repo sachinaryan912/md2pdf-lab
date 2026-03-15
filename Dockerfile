@@ -27,6 +27,7 @@ RUN npm ci --include=dev
 # Copy source and compile
 COPY tsconfig.json ./
 COPY src ./src
+COPY public ./public
 RUN npm run build
 
 # Prune dev dependencies for production
@@ -58,8 +59,9 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-# Copy compiled app and production deps from builder
+# Copy compiled app, production deps, and static frontend from builder
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 
