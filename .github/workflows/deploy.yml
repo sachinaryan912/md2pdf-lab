@@ -152,10 +152,15 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Debug image
+        run: |
+          echo "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+
       - name: Deploy to Cloud Run
         run: |
+          IMAGE_URL="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.ARTIFACT_REPO }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
           gcloud run deploy ${{ secrets.SERVICE_NAME }} \
-            --image="${{ needs.docker.outputs.image_url }}" \
+            --image="$IMAGE_URL" \
             --region="${{ secrets.GCP_REGION }}" \
             --platform=managed \
             --allow-unauthenticated \
