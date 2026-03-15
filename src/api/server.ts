@@ -1,11 +1,13 @@
 /**
  * Express REST API Server
  * Endpoints:
- *   GET  /health       - Liveness probe
- *   POST /convert      - Convert Markdown body → PDF download
- *   GET  /preview      - Render Markdown as styled HTML (browser preview)
+ *   GET  /          - Frontend UI (static files from public/)
+ *   GET  /health    - Liveness probe
+ *   POST /convert   - Convert Markdown body → PDF download
+ *   GET  /preview   - Render Markdown as styled HTML (browser preview)
  */
 import express, { Request, Response, NextFunction } from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -80,6 +82,10 @@ export function createApp(): express.Application {
       stream: { write: (message: string) => logger.http(message.trim()) },
     })
   );
+
+  // ── Static frontend (public/ directory) ─────────────────────────────
+  const publicDir = path.join(__dirname, '..', '..', 'public');
+  app.use(express.static(publicDir));
 
   // ── Routes ────────────────────────────────────────────────────────────
 
@@ -191,10 +197,12 @@ export function createApp(): express.Application {
 export function startServer(port: number = 8080): void {
   const app = createApp();
   const server = app.listen(port, () => {
-    logger.info(`🚀 md2pdf-lab API running on http://localhost:${port}`);
+    logger.info(`🚀 md2pdf-lab running on http://localhost:${port}`);
+    logger.info(`   🌐 Frontend     → http://localhost:${port}/`);
     logger.info(`   POST /convert  → Markdown → PDF`);
     logger.info(`   GET  /health   → Health check`);
     logger.info(`   GET  /preview  → Browser HTML preview`);
+    logger.info(`   🎮 Game        → http://localhost:${port}/#game`);
   });
 
   // Graceful shutdown
