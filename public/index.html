@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>md2pdf-lab — Markdown to PDF Converter</title>
+  <meta name="description" content="Convert Markdown to beautiful PDFs instantly. Choose themes, live preview, and download in one click." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <!-- Marked.js for live preview -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <!-- Highlight.js for code preview -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     HEADER / NAV
+══════════════════════════════════════════════════════════════════ -->
+<header class="header" id="header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-icon">📄</span>
+      <span class="logo-text">md2pdf<span class="logo-accent">-lab</span></span>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" id="nav-editor" onclick="showTab('editor')">✏️ Editor</button>
+      <button class="nav-btn" id="nav-game" onclick="showTab('game')">🎮 Game</button>
+      <button class="nav-btn" id="nav-api" onclick="showTab('api')">🔌 API</button>
+    </nav>
+    <div class="header-actions">
+      <button class="btn-icon" id="theme-toggle" title="Toggle theme" onclick="toggleTheme()">🌙</button>
+      <a href="https://github.com/your-org/md2pdf-lab" target="_blank" class="btn-icon" title="GitHub">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB: EDITOR
+══════════════════════════════════════════════════════════════════ -->
+<main>
+<section id="tab-editor" class="tab-section active">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-badge">✨ Powered by Puppeteer</div>
+    <h1 class="hero-title">Markdown → Beautiful PDF</h1>
+    <p class="hero-sub">Write Markdown, preview live, download a polished PDF — in seconds.</p>
+  </div>
+
+  <!-- Options Bar -->
+  <div class="options-bar" id="options-bar">
+    <div class="option-group">
+      <label class="option-label">Theme</label>
+      <div class="segmented" id="theme-select">
+        <button class="seg-btn active" data-value="light" onclick="setOption('theme',this)">☀️ Light</button>
+        <button class="seg-btn" data-value="dark" onclick="setOption('theme',this)">🌙 Dark</button>
+        <button class="seg-btn" data-value="github" onclick="setOption('theme',this)">🐙 GitHub</button>
+      </div>
+    </div>
+    <div class="option-group">
+      <label class="option-label">Page Size</label>
+      <div class="segmented" id="pagesize-select">
+        <button class="seg-btn active" data-value="A4" onclick="setOption('pageSize',this)">A4</button>
+        <button class="seg-btn" data-value="Letter" onclick="setOption('pageSize',this)">Letter</button>
+        <button class="seg-btn" data-value="Legal" onclick="setOption('pageSize',this)">Legal</button>
+      </div>
+    </div>
+    <div class="option-group">
+      <label class="option-label">Margin <span id="margin-val">15</span>mm</label>
+      <input type="range" id="margin-input" min="5" max="40" value="15" class="range-input"
+             oninput="document.getElementById('margin-val').textContent=this.value" />
+    </div>
+    <div class="option-group toggles">
+      <label class="toggle-label"><input type="checkbox" id="opt-toc" checked /> TOC</label>
+      <label class="toggle-label"><input type="checkbox" id="opt-math" checked /> Math</label>
+      <label class="toggle-label"><input type="checkbox" id="opt-hf" /> Header/Footer</label>
+    </div>
+    <button class="btn-convert" id="convert-btn" onclick="convertToPdf()">
+      <span id="convert-text">⬇ Download PDF</span>
+      <span id="convert-spinner" class="spinner hidden"></span>
+    </button>
+  </div>
+
+  <!-- Editor / Preview Split -->
+  <div class="editor-layout" id="editor-layout">
+    <div class="pane pane-editor">
+      <div class="pane-header">
+        <span class="pane-title">📝 Markdown</span>
+        <div class="pane-actions">
+          <button class="pane-btn" onclick="loadSample()" title="Load sample">Load Sample</button>
+          <button class="pane-btn" onclick="clearEditor()" title="Clear">Clear</button>
+          <label class="pane-btn" for="file-upload" title="Open file" style="cursor:pointer">Open .md</label>
+          <input type="file" id="file-upload" accept=".md,.txt" style="display:none" onchange="openFile(event)" />
+        </div>
+      </div>
+      <textarea id="md-editor" class="md-textarea" placeholder="# Start writing Markdown here...
+
+## Features
+- **Bold** and *italic*
+- Tables, code blocks
+- Math: $E = mc^2$
+- Mermaid diagrams
+
+Type anything and see it live on the right →" spellcheck="false" oninput="updatePreview()"></textarea>
+      <div class="pane-footer">
+        <span id="char-count">0 chars</span>
+        <span id="word-count">0 words</span>
+      </div>
+    </div>
+
+    <div class="pane-divider" id="divider"></div>
+
+    <div class="pane pane-preview">
+      <div class="pane-header">
+        <span class="pane-title">👁️ Preview</span>
+        <div class="pane-actions">
+          <button class="pane-btn" onclick="openFullPreview()" title="Full preview">Full Preview ↗</button>
+        </div>
+      </div>
+      <div id="preview-content" class="preview-body"></div>
+      <div id="preview-empty" class="preview-empty">
+        <div class="empty-icon">📄</div>
+        <p>Your preview will appear here</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div id="toast" class="toast hidden"></div>
+
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB: GAME — Markdown Dungeon
+══════════════════════════════════════════════════════════════════ -->
+<section id="tab-game" class="tab-section">
+  <div class="game-container">
+
+    <div class="game-header">
+      <div class="game-title-row">
+        <h2 class="game-title">⚔️ Markdown Dungeon</h2>
+        <div class="score-badge">Score: <span id="game-score">0</span> / <span id="game-total">5</span></div>
+      </div>
+      <p class="game-desc">Fix the broken Markdown in each room to escape the dungeon!</p>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="game-progress"></div>
+      </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="game-start" class="game-screen">
+      <div class="dungeon-art">
+        🏰
+        <div class="dungeon-sub">A dungeon of broken Markdown awaits...</div>
+      </div>
+      <div class="start-features">
+        <div class="feature-pill">5 Rooms</div>
+        <div class="feature-pill">3 Attempts Each</div>
+        <div class="feature-pill">Hints Available</div>
+      </div>
+      <input id="game-player-name" class="game-input" type="text" placeholder="Enter your name, adventurer..." maxlength="30" />
+      <button class="btn-start" onclick="startGame()">⚔️ Enter the Dungeon</button>
+    </div>
+
+    <!-- Room Screen -->
+    <div id="game-room" class="game-screen hidden">
+      <div class="room-header">
+        <div class="room-badge" id="room-badge">Room 1</div>
+        <h3 class="room-title" id="room-title"></h3>
+      </div>
+      <p class="room-desc" id="room-desc"></p>
+
+      <div class="broken-md-block">
+        <div class="block-label">🔴 Broken Markdown</div>
+        <pre class="broken-code" id="broken-code"></pre>
+      </div>
+
+      <div class="answer-block">
+        <div class="block-label">✏️ Your Fix</div>
+        <textarea id="answer-input" class="answer-textarea" placeholder="Type your corrected Markdown here..."></textarea>
+        <div class="answer-actions">
+          <span class="attempts-left" id="attempts-left">3 attempts left</span>
+          <button class="btn-hint" id="hint-btn" onclick="showHint()">💡 Hint</button>
+          <button class="btn-submit" onclick="submitAnswer()">Submit →</button>
+        </div>
+      </div>
+
+      <div id="hint-box" class="hint-box hidden"></div>
+      <div id="room-feedback" class="room-feedback hidden"></div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="game-end" class="game-screen hidden">
+      <div id="end-emoji" class="end-emoji"></div>
+      <h3 class="end-title" id="end-title"></h3>
+      <p class="end-sub" id="end-sub"></p>
+      <div class="final-score">
+        <span class="score-num" id="final-score-num"></span>
+        <span class="score-denom"> / 5</span>
+      </div>
+      <div class="score-breakdown" id="score-breakdown"></div>
+      <button class="btn-start" onclick="resetGame()">🔄 Play Again</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB: API DOCS
+══════════════════════════════════════════════════════════════════ -->
+<section id="tab-api" class="tab-section">
+  <div class="api-container">
+    <h2 class="api-title">🔌 REST API Reference</h2>
+    <p class="api-sub">All endpoints accept and return JSON. The <code>/convert</code> endpoint returns a PDF binary.</p>
+
+    <!-- Endpoint: Health -->
+    <div class="endpoint-card">
+      <div class="endpoint-header">
+        <span class="method-badge get">GET</span>
+        <code class="endpoint-path">/health</code>
+        <span class="endpoint-desc">Service health check</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="code-block">
+          <div class="code-block-header">Request</div>
+          <pre><code class="language-bash">curl https://your-service.run.app/health</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-block-header">Response <span class="status-200">200 OK</span></div>
+          <pre><code class="language-json">{
+  "status": "ok",
+  "service": "md2pdf-lab",
+  "version": "1.0.0",
+  "uptime": 42
+}</code></pre>
+        </div>
+        <button class="btn-try" onclick="tryHealth()">▶ Try it</button>
+        <pre id="health-result" class="try-result hidden"></pre>
+      </div>
+    </div>
+
+    <!-- Endpoint: Convert -->
+    <div class="endpoint-card">
+      <div class="endpoint-header">
+        <span class="method-badge post">POST</span>
+        <code class="endpoint-path">/convert</code>
+        <span class="endpoint-desc">Convert Markdown to PDF</span>
+      </div>
+      <div class="endpoint-body">
+        <table class="params-table">
+          <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>markdown</code></td><td>string</td><td><em>required</em></td><td>Raw Markdown content</td></tr>
+            <tr><td><code>theme</code></td><td>light|dark|github</td><td>light</td><td>PDF visual theme</td></tr>
+            <tr><td><code>pageSize</code></td><td>A4|Letter|Legal</td><td>A4</td><td>Page dimensions</td></tr>
+            <tr><td><code>margin</code></td><td>number (0-50)</td><td>15</td><td>Margin in mm</td></tr>
+            <tr><td><code>toc</code></td><td>boolean</td><td>true</td><td>Table of contents</td></tr>
+            <tr><td><code>math</code></td><td>boolean</td><td>true</td><td>MathJax rendering</td></tr>
+            <tr><td><code>mermaid</code></td><td>boolean</td><td>true</td><td>Mermaid diagrams</td></tr>
+            <tr><td><code>displayHeaderFooter</code></td><td>boolean</td><td>false</td><td>Page header/footer</td></tr>
+            <tr><td><code>filename</code></td><td>string</td><td>document</td><td>Download filename</td></tr>
+          </tbody>
+        </table>
+        <div class="code-block">
+          <div class="code-block-header">Request</div>
+          <pre><code class="language-bash">curl -X POST /convert \
+  -H "Content-Type: application/json" \
+  -d '{"markdown":"# Hello","theme":"dark"}' \
+  --output doc.pdf</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-block-header">Response</div>
+          <pre><code>200 OK
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="Hello.pdf"
+
+[binary PDF data]</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Endpoint: Preview -->
+    <div class="endpoint-card">
+      <div class="endpoint-header">
+        <span class="method-badge get">GET</span>
+        <code class="endpoint-path">/preview?md=...&theme=dark</code>
+        <span class="endpoint-desc">Render Markdown as HTML in browser</span>
+      </div>
+      <div class="endpoint-body">
+        <div class="code-block">
+          <div class="code-block-header">Example</div>
+          <pre><code class="language-bash">curl "/preview?md=%23%20Hello&theme=dark"</code></pre>
+        </div>
+        <button class="btn-try" onclick="openPreviewDemo()">▶ Open Demo Preview ↗</button>
+      </div>
+    </div>
+
+  </div>
+</section>
+</main>
+
+<!-- Footer -->
+<footer class="footer">
+  <p>Built with ❤️ using Node.js, TypeScript, Puppeteer &amp; Express &nbsp;·&nbsp; MIT License</p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
