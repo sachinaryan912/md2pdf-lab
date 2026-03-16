@@ -95,7 +95,7 @@ export function createApp(): express.Application {
    */
   app.get('/health', (_req: Request, res: Response) => {
     res.json({
-      status: 'ok',
+      status: 'ok sachin',
       service: 'md2pdf-lab',
       version: process.env.npm_package_version ?? '1.0.0',
       timestamp: new Date().toISOString(),
