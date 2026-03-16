@@ -13,7 +13,7 @@ describe('GET /health', () => {
   it('should return 200 with status ok', async () => {
     const res = await request.get('/health');
     expect(res.status).toBe(200);
-    expect(res.body.status).toBe('ok sachin');
+    expect(res.body.status).toBe('ok new version');
     expect(res.body.service).toBe('md2pdf-lab');
     expect(res.body.timestamp).toBeDefined();
     expect(typeof res.body.uptime).toBe('number');
