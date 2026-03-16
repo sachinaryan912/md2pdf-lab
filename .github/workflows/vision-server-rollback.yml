@@ -59,7 +59,7 @@ jobs:
           
           echo "Rolling back to image: $IMAGE_URL"
           
-          gcloud run deploy ${{ secrets.SERVICE_NAME }} \
+          gcloud run deploy ${{ secrets.VISION_SERVER_SERVICE_NAME }} \
             --image="$IMAGE_URL" \
             --region="${{ secrets.GCP_REGION }}" \
             --platform=managed \
